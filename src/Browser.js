@@ -55,6 +55,11 @@
                     _browser: {
                         value: browser
                     },
+                    _cookies: {
+                        get: function() {
+                            return this._browser._cookies;
+                        }
+                    },
                     _options: {
                         value: lodash.merge({}, browser._options, options)
                     },
@@ -221,7 +226,7 @@
             }
             return request;
         }).then(request => {
-            return this._browser._cookies.getCookieString(url + '', {
+            return this._cookies.getCookieString(url + '', {
                 http: true,
                 now: request.time.toDate(),
                 ignoreError: true
@@ -241,7 +246,7 @@
                     } else {
                         cookies = [response.headers['set-cookie']];
                     }
-                    return Promise.all(cookies.map(cookie => this._browser._cookies.setCookie(cookie, url + '', {
+                    return Promise.all(cookies.map(cookie => this._cookies.setCookie(cookie, url + '', {
                         http: true,
                         now: request.time.toDate(),
                         ignoreError: true
@@ -324,6 +329,46 @@
     Browser.prototype = Object.create(Object.prototype, {
         constructor: {
             value: Browser
+        },
+        request: {
+            value: function(url, options) {
+                url = new URL(url);
+                options = lodash.merge({}, this._options, {
+                    method: 'GET',
+                    content: {
+                        processors: {
+                            text: {
+                                plain: textProcessor,
+                                html: jsdomProcessor
+                            },
+                            application: {
+                                'xhtml+xml': jsdomProcessor,
+                                xml: jsdomProcessor
+                            }
+                        }
+                    }
+                }, options);
+                return _load.call(this, url, options);
+            }
+        },
+        resource: {
+            value: function (url, options) {
+                url = new URL(url);
+                options = options || {};
+                let loadOptions = lodash.merge({}, this._options, options);
+                if (loadOptions.content == null) {
+                    loadOptions.content = {};
+                }
+                loadOptions.content.processors = {
+                    '*': {'*': bufferStoreProcessor}
+                };
+                return _load.call(this, url, loadOptions).then(page => {
+                    if (page.response.statusCode === 200 && Buffer.isBuffer(page.content)) {
+                        return page.content;
+                    }
+                    return Buffer.allocUnsafe(0);
+                });
+            }
         }
     });
 

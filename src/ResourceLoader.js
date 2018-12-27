@@ -29,29 +29,53 @@
             if (options.element == null) {
                 return null;
             }
-            if (options.element.nodeName.toUpperCase() === 'LINK' && options.element.hasAttribute('rel') && options.element.getAttribute('rel').toLowerCase() === 'stylesheet') {
-                return isReourceAllowed(this._options.stylesheet, url + '', options.element).then(isAllowed => {
-                    if (!isAllowed) {
-                        return Buffer.allocUnsafe(0);
+            if(url.startsWith('blob:')) {
+                url = url.substr('blob:'.length);
+                url = new URL(url);
+                let window = options.element.ownerDocument.defaultView;
+                if(url.origin !== window.location.origin || url.pathname.length < 1 || !url.pathname.startsWith('/')) {
+                    return null;
+                }
+                let blobSymbol = require('./dom').blobUrl.impl;
+                if(window[blobSymbol] == null) {
+                    return null;
+                }
+                let id = url.pathname.substr(1);
+                if(window[blobSymbol].hasOwnProperty(id)) {
+                    let blob = window[blobSymbol][id];
+                    if(blob instanceof window.Blob) {
+                        let buffer = null;
+                        if(Object.getOwnPropertySymbols(blob).some(symbol => {
+                            let impl = blob[symbol];
+                            if(impl != null && Buffer.isBuffer(blob[symbol]._buffer)) {
+                                buffer = blob[symbol]._buffer;
+                                return true;
+                            }
+                            return false;
+                        })) {
+                            return Promise.resolve(buffer);
+                        }
                     }
-                    return this.stylesheet(url, options);
-                });
+                }
+                return null;
+            }
+            if (options.element.nodeName.toUpperCase() === 'LINK' && options.element.hasAttribute('rel') && options.element.getAttribute('rel').toLowerCase() === 'stylesheet') {
+                if(!isReourceAllowed(this._options.stylesheet, url + '', options.element)) {
+                    return null;
+                }
+                return this.stylesheet(url, options);
             }
             if (options.element.nodeName.toUpperCase() === 'SCRIPT') {
-                return isReourceAllowed(this._options.script, url + '', options.element).then(isAllowed => {
-                    if (!isAllowed) {
-                        return Buffer.allocUnsafe(0);
-                    }
-                    return this.script(url, options);
-                });
+                if(!isReourceAllowed(this._options.script, url + '', options.element)) {
+                    return null;
+                }
+                return this.script(url, options);
             }
             if (['IFRAME', 'FRAME'].indexOf(options.element.nodeName.toUpperCase()) >= 0) {
-                return isReourceAllowed(this._options.frame, url + '', options.element).then(isAllowed => {
-                    if (!isAllowed) {
-                        return Buffer.allocUnsafe(0);
-                    }
-                    return this.frame(url, options);
-                });
+                if(!isReourceAllowed(this._options.frame, url + '', options.element)) {
+                    return null;
+                }
+                return this.frame(url, options);
             }
             return null;
         }
@@ -172,61 +196,57 @@
     }
 
     function isReourceAllowed(criteria, url, element) {
-        return Promise.resolve(criteria).then(criteria => {
-            if (criteria === true) {
+        if (criteria === true) {
+            return true;
+        }
+        if (criteria == null || criteria === false) {
+            return false;
+        }
+        if (Array.isArray(criteria)) {
+            return criteria.some(criteria, c => isResourceAllowed(c, url, element));
+        }
+        if (typeof criteria === 'function') {
+            return criteria(url, element);
+        }
+        url = new URL(url);
+        return [
+            'protocol',
+            'hostname',
+            'port',
+            'host',
+            'username',
+            'password',
+            'origin',
+            'pathname',
+            'search',
+            'searchParams',
+            'hash',
+            'href'
+        ].every(option => {
+            if(Array.isArray(criteria[option])) {
+                return criteria[option].some(cc => optionHandler(cc));
+            }
+            return optionHandler(criteria[option]);
+
+            function optionHandler(c) {
+                if (typeof c === 'function') {
+                    return c.call(null, url[option], element);
+                }
+                if (typeof url[option] === 'string') {
+                    if (c instanceof RegExp) {
+                        return c.test(url[option]);
+                    }
+                }
+                if (resourceUrlHandlers[option] != null) {
+                    return resourceUrlHandlers[option](c, url, element);
+                }
+                if (typeof url[option] === 'string') {
+                    if (typeof c === 'string') {
+                        return c === url[option];
+                    }
+                }
                 return true;
             }
-            if (criteria == null || criteria === false) {
-                return false;
-            }
-            if (Array.isArray(criteria)) {
-                return Promise.some(criteria, c => isResourceAllowed(c, url, element));
-            }
-            if (typeof criteria === 'function') {
-                return criteria(url, element);
-            }
-            url = new URL(url);
-            return Promise.every([
-                'protocol',
-                'hostname',
-                'port',
-                'host',
-                'username',
-                'password',
-                'origin',
-                'pathname',
-                'search',
-                'searchParams',
-                'hash',
-                'href'
-            ], option => {
-                return Promise.resolve(criteria[option]).then(c => {
-                    if (Array.isArray(c)) {
-                        return Promise.some(c, cc => optionHandler(cc));
-                    }
-                    return optionHandler(c);
-                });
-
-                function optionHandler(c) {
-                    if (typeof c === 'function') {
-                        return c.call(null, url[option], element);
-                    }
-                    if (typeof url[option] === 'string') {
-                        if (c instanceof RegExp) {
-                            return c.test(url[option]);
-                        }
-                    }
-                    if (resourceUrlHandlers[option] != null) {
-                        return resourceUrlHandlers[option](c, url, element);
-                    }
-                    if (typeof url[option] === 'string') {
-                        if (typeof c === 'string') {
-                            return c === url[option];
-                        }
-                    }
-                    return true;
-                }
-            });
         });
     }
 

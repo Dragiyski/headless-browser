@@ -6,9 +6,11 @@
   "main": "index.js",
   "dependencies": {
     "aigle": "^1.12.0",
+    "canvas": "^2.2.0",
     "jsdom": "^13.1.0",
     "lodash": "^4.17.11",
     "moment": "^2.23.0",
-    "punycode": "^2.1.1"
+    "punycode": "^2.1.1",
+    "uuid": "^3.3.2"
   }
 }

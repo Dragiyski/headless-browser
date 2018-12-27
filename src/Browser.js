@@ -477,6 +477,8 @@
                 opt.referrer = page.request.getHeader('referer');
             }
             let jsDomOptions = lodash.assign({}, opt, options.jsdom);
+            let afterInternal = jsDomOptions.beforeParse;
+            jsDomOptions.beforeParse = require('./dom').extensions(afterInternal);
             page.window = new jsdom.JSDOM(buffer, jsDomOptions).window;
             let resolved = false;
             return new Promise((resolve, reject) => {

@@ -32,7 +32,7 @@
             if (options.element.nodeName.toUpperCase() === 'LINK' && options.element.hasAttribute('rel') && options.element.getAttribute('rel').toLowerCase() === 'stylesheet') {
                 return isReourceAllowed(this._options.stylesheet, url + '', options.element).then(isAllowed => {
                     if (!isAllowed) {
-                        return BUffer.allocUnsafe(0);
+                        return Buffer.allocUnsafe(0);
                     }
                     return this.stylesheet(url, options);
                 });

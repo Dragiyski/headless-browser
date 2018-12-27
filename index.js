@@ -1,0 +1,1 @@
+exports.Browser = require('./src/Browser');

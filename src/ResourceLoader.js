@@ -59,20 +59,23 @@
                 }
                 return null;
             }
+            if(url.startsWith('data:')) {
+                return null;
+            }
             if (options.element.nodeName.toUpperCase() === 'LINK' && options.element.hasAttribute('rel') && options.element.getAttribute('rel').toLowerCase() === 'stylesheet') {
-                if(!isReourceAllowed(this._options.stylesheet, url + '', options.element)) {
+                if(!isResourceAllowed(this._options.stylesheet, url + '', options.element)) {
                     return null;
                 }
                 return this.stylesheet(url, options);
             }
             if (options.element.nodeName.toUpperCase() === 'SCRIPT') {
-                if(!isReourceAllowed(this._options.script, url + '', options.element)) {
+                if(!isResourceAllowed(this._options.script, url + '', options.element)) {
                     return null;
                 }
                 return this.script(url, options);
             }
             if (['IFRAME', 'FRAME'].indexOf(options.element.nodeName.toUpperCase()) >= 0) {
-                if(!isReourceAllowed(this._options.frame, url + '', options.element)) {
+                if(!isResourceAllowed(this._options.frame, url + '', options.element)) {
                     return null;
                 }
                 return this.frame(url, options);
@@ -195,7 +198,7 @@
         }
     }
 
-    function isReourceAllowed(criteria, url, element) {
+    function isResourceAllowed(criteria, url, element) {
         if (criteria === true) {
             return true;
         }
@@ -203,7 +206,7 @@
             return false;
         }
         if (Array.isArray(criteria)) {
-            return criteria.some(criteria, c => isResourceAllowed(c, url, element));
+            return criteria.some(c => isResourceAllowed(c, url, element));
         }
         if (typeof criteria === 'function') {
             return criteria(url, element);

@@ -89,6 +89,10 @@
                     }
                 });
             }
+        },
+        ResourceLoader: {
+            enumerable: true,
+            value: ResourceLoader
         }
     });
 
@@ -160,12 +164,14 @@
                 loadOptions.content.processors = {
                     '*': {'*': bufferStoreProcessor}
                 };
-                return _load.call(this, url, loadOptions).then(page => {
+                let returnedPromise = _load.call(this, url, loadOptions).then(page => {
+                    returnedPromise.response = page.response;
                     if (page.response.statusCode === 200 && Buffer.isBuffer(page.content)) {
                         return page.content;
                     }
                     return Buffer.allocUnsafe(0);
                 });
+                return returnedPromise;
             }
         },
         getPage: {
@@ -221,7 +227,7 @@
             if (options.redirect != null && options.redirect._from instanceof Browser.Page) {
                 let lastRequest = options.redirect._from.request;
                 if (lastRequest.hasHeader('referer')) {
-                    request.setHeader(lastRequest.getHeader('referer'));
+                    request.setHeader('referer', lastRequest.getHeader('referer'));
                 }
             }
             return request;
@@ -281,7 +287,7 @@
                 }
                 processPage = false;
                 page.response.connection.end();
-                return _load(nextUrl, lodash.merge({}, options, nextOptions));
+                return _load.call(this, nextUrl, lodash.merge({}, options, nextOptions));
             }
             return page;
         }).then(page => {
@@ -426,16 +432,6 @@
     function bufferProcessor(page) {
         return Promise.attempt(() => {
             let dynamic = true, buffer, processed = 0;
-            if (page.response.headers.hasOwnProperty('content-length')) {
-                let length = parseInt(page.response.headers['content-length']);
-                if (isFinite(length) && length > 0) {
-                    dynamic = false;
-                    buffer = Buffer.allocUnsafe(length);
-                }
-            }
-            if (buffer == null) {
-                buffer = Buffer.allocUnsafe(0);
-            }
             return new Promise((resolve, reject) => {
                 const getData = data => {
                     if (dynamic) {
@@ -445,11 +441,32 @@
                         processed += data.length;
                     }
                 };
-                page.response.on('data', getData);
-                page.response.once('end', () => {
-                    page.response.removeListener('data', getData);
-                    resolve(buffer);
-                });
+                if(page.response.headers.hasOwnProperty('content-encoding') && page.response.headers['content-encoding'] === 'gzip') {
+                    let zlib = require('zlib');
+                    let stream = zlib.createGunzip();
+                    buffer = Buffer.allocUnsafe(0);
+                    stream.on('data', getData);
+                    stream.once('end', () => {
+                        resolve(buffer);
+                    });
+                    page.response.pipe(stream);
+                } else {
+                    if (page.response.headers.hasOwnProperty('content-length')) {
+                        let length = parseInt(page.response.headers['content-length']);
+                        if (isFinite(length) && length > 0) {
+                            dynamic = false;
+                            buffer = Buffer.allocUnsafe(length);
+                        }
+                    }
+                    if (buffer == null) {
+                        buffer = Buffer.allocUnsafe(0);
+                    }
+                    page.response.on('data', getData);
+                    page.response.once('end', () => {
+                        page.response.removeListener('data', getData);
+                        resolve(buffer);
+                    });
+                }
                 page.response.once('error', err => {
                     reject(err);
                 });
@@ -465,13 +482,17 @@
 
     function jsdomProcessor(page, options, type) {
         return bufferProcessor(page).then(buffer => {
+            let rl = options && options.resourceLoader;
+            if(typeof rl !== 'function') {
+                rl = ResourceLoader;
+            }
             let opt = {
                 url: page.url + '',
                 contentType: type.mime,
                 cookieJar: this._cookies,
                 pretendToBeVisual: true,
                 runScripts: 'dangerously',
-                resources: new ResourceLoader(this, options.resources || {})
+                resources: new rl(this, options.resources || {})
             };
             if (page.request.hasHeader('referer')) {
                 opt.referrer = page.request.getHeader('referer');

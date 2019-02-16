@@ -491,8 +491,7 @@
                 contentType: type.mime,
                 cookieJar: this._cookies,
                 pretendToBeVisual: true,
-                runScripts: 'dangerously',
-                resources: new rl(this, options.resources || {})
+                runScripts: 'dangerously'
             };
             if (page.request.hasHeader('referer')) {
                 opt.referrer = page.request.getHeader('referer');
@@ -500,6 +499,9 @@
             let jsDomOptions = lodash.assign({}, opt, options.jsdom);
             let afterInternal = jsDomOptions.beforeParse;
             jsDomOptions.beforeParse = require('./dom').extensions(afterInternal);
+            jsDomOptions.resources = jsDomOptions.resources || new rl(this, lodash.merge(options.resources || {}, {
+                _beforeParse: jsDomOptions.beforeParse
+            }));
             page.window = new jsdom.JSDOM(buffer, jsDomOptions).window;
             let resolved = false;
             return new Promise((resolve, reject) => {

@@ -1,6 +1,6 @@
 {
   "name": "hbrow",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "author": "Plamen Dragiyski <plamen@dragiyski.org>",
   "license": "GPL-v3.0",
   "main": "index.js",

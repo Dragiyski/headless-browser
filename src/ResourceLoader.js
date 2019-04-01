@@ -188,10 +188,6 @@
                     referer = null;
                 }
             }
-            if(this._options != null && typeof this._options._beforeParse === 'function') {
-                let beforeParse = this._options._beforeParse;
-                beforeParse(options.element.contentWindow);
-            }
             return this._tab.resource(url, {
                 request: {
                     headers: {
@@ -262,12 +258,9 @@
             if (typeof criteria === 'string') {
                 let haystack = criteria.toLowerCase().split('.').map(punycode.toASCII).reverse();
                 let needle = url.hostname.toLowerCase().split('.').map(punycode.toASCII).reverse();
-                if (haystack.length >= 1 && haystack[0] === '@') {
+                if (haystack.length > 1 && haystack[0] === '@') {
                     haystack.shift();
                     let base = element.ownerDocument.defaultView.top.location.hostname.toLowerCase().split('.').map(punycode.toASCII).reverse();
-                    if(base.length > 0 && base[base.length - 1] === 'www') {
-                        base.pop();
-                    }
                     haystack = base.concat(haystack);
                 }
                 for (let i = 0, hl = haystack.length; i < hl; ++i) {
